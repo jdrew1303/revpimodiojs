@@ -1,7 +1,7 @@
 import assert from 'assert';
 import config from '../config.js';
 import path from 'path';
-import { RevPiModIO, RevPiModIOSelected } from '../revpimodio.js';
+import { RevPiModIO, RevPiModIOSelected, RevPiModIODriver } from '../revpimodio.js';
 
 // Mock the config loader to use our test config
 config.findConfig = () => path.resolve(process.cwd(), 'revpimodio-js/test/mock-config.rsc');
@@ -69,9 +69,22 @@ async function testRevPiModIOSelected() {
     console.log('RevPiModIOSelected tests passed.');
 }
 
+async function testRevPiModIODriver() {
+    console.log('Running RevPiModIODriver tests...');
+
+    const rpi = new RevPiModIODriver('MyDevice', { simulator: true });
+
+    assert.strictEqual(rpi.devices.length, 1, 'Should load one device');
+    assert.ok(rpi.io.Input1, 'Input1 should exist');
+    assert.strictEqual(rpi.options.simulator, true, 'Simulator should be enabled');
+
+    console.log('RevPiModIODriver tests passed.');
+}
+
 async function runTests() {
     await testRevPiModIO();
     await testRevPiModIOSelected();
+    await testRevPiModIODriver();
 }
 
 runTests();

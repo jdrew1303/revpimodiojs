@@ -16,6 +16,8 @@
   "author": "Jules",
   "license": "LGPL-2.0-or-later",
   "dependencies": {
-    "ioctl-napi": "^0.3.0"
+    "configparser": "^0.3.10",
+    "ioctl-napi": "^0.3.0",
+    "typed-struct": "^2.6.0"
   }
 }

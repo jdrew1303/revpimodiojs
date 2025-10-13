@@ -185,9 +185,18 @@ class RevPiModIOSelected extends RevPiModIO {
 
         this._createDevices(selectedDevices);
         this.processImage = Buffer.alloc(this.length);
+        if (this.options.replace_io_file) {
+            this._configure_replace_io();
+        }
         this._startAutorefresh();
     }
 }
 
 
-export { RevPiModIO, RevPiModIOSelected };
+class RevPiModIODriver extends RevPiModIOSelected {
+    constructor(virtdev, options = {}) {
+        super(virtdev, { ...options, simulator: true });
+    }
+}
+
+export { RevPiModIO, RevPiModIOSelected, RevPiModIODriver };
