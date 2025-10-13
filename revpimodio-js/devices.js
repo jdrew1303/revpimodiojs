@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import piControl from './piControl.js';
+import { jspack } from 'jspack';
 
 const ProductType = {
     DIO: 96,
@@ -54,6 +55,12 @@ class IO extends EventEmitter {
 
     reg_event(callback) {
         this.on('change', (data) => callback(this.name, data.value));
+    }
+
+    replace_io(name, frm, options = {}) {
+        const newIO = new StructIO(this, name, frm, options);
+        this.revpi.io.add(newIO);
+        delete this.revpi.io[this.name];
     }
 }
 
@@ -129,6 +136,26 @@ class RelaisOutput extends IO {
     }
 }
 
+class StructIO extends IO {
+    constructor(parentio, name, frm, options) {
+        super(parentio.revpi, name, parentio.offset, parentio.length, parentio.bit, parentio.type);
+        this.frm = frm;
+        this.options = options;
+    }
+
+    get value() {
+        const buffer = super.value;
+        const byteorder = this.options.byteorder === 'big' ? '>' : '<';
+        return jspack.Unpack(byteorder + this.frm, buffer)[0];
+    }
+
+    set value(newValue) {
+        const byteorder = this.options.byteorder === 'big' ? '>' : '<';
+        const buffer = Buffer.from(jspack.Pack(byteorder + this.frm, [newValue]));
+        super.value = buffer;
+    }
+}
+
 class IOList {
     constructor() {}
 
@@ -151,4 +178,4 @@ class Device {
     }
 }
 
-export { Device, IO, IntIO, IntIOCounter, RelaisOutput, IOList, ProductType };
+export { Device, IO, IntIO, IntIOCounter, RelaisOutput, StructIO, IOList, ProductType };

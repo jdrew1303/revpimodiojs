@@ -81,10 +81,26 @@ async function testRevPiModIODriver() {
     console.log('RevPiModIODriver tests passed.');
 }
 
+async function testReplaceIO() {
+    console.log('Running ReplaceIO tests...');
+
+    const rpi = new RevPiModIO({ simulator: true });
+    rpi.io.Output1.replace_io('MyFloat', 'f');
+    assert.ok(rpi.io.MyFloat, 'MyFloat should exist');
+    assert.strictEqual(rpi.io.Output1, undefined, 'Output1 should not exist');
+
+    const rpi2 = new RevPiModIO({ simulator: true, replace_io_file: path.resolve(process.cwd(), 'revpimodio-js/test/replace_ios.conf') });
+    assert.ok(rpi2.io.MyFloat, 'MyFloat should exist');
+    assert.strictEqual(rpi2.io.Output1, undefined, 'Output1 should not exist');
+
+    console.log('ReplaceIO tests passed.');
+}
+
 async function runTests() {
     await testRevPiModIO();
     await testRevPiModIOSelected();
     await testRevPiModIODriver();
+    await testReplaceIO();
 }
 
 runTests();

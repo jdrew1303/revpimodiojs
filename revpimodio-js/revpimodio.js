@@ -2,6 +2,7 @@ import fs from 'fs';
 import config from './config.js';
 import piControl from './piControl.js';
 import { Device, IO, IntIO, IntIOCounter, RelaisOutput, IOList, ProductType } from './devices.js';
+import configparser from 'configparser';
 
 class RevPiModIO {
     constructor(options = {}) {
@@ -11,6 +12,7 @@ class RevPiModIO {
             syncoutputs: true,
             simulator: false,
             debug: true,
+            replace_io_file: null,
             ...options,
         };
 
@@ -41,7 +43,30 @@ class RevPiModIO {
 
         this._createDevices();
         this.processImage = Buffer.alloc(this.length);
+        if (this.options.replace_io_file) {
+            this._configure_replace_io();
+        }
         this._startAutorefresh();
+    }
+
+    _configure_replace_io() {
+        const cp = new configparser();
+        cp.read(this.options.replace_io_file);
+        const sections = cp.sections();
+        for (const section of sections) {
+            if (section === 'DEFAULT') {
+                continue;
+            }
+            const parentio = cp.get(section, 'replace');
+            const frm = cp.get(section, 'frm');
+            const options = {};
+            for (const [key, value] of Object.entries(cp.items(section))) {
+                if (key !== 'replace' && key !== 'frm') {
+                    options[key] = value;
+                }
+            }
+            this.io[parentio].replace_io(section, frm, options);
+        }
     }
 
     _createDevices(devices = null) {
