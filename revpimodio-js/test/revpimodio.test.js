@@ -32,6 +32,17 @@ async function testRevPiModIO() {
     rpi.io.Output1.value = true;
     assert.strictEqual(eventFired, true, 'Event should have fired');
 
+    let cycleCount = 0;
+    const cyclePromise = rpi.cycleloop(async () => {
+        cycleCount++;
+        if (cycleCount > 2) {
+            rpi.exit();
+        }
+    }, 10);
+
+    await cyclePromise;
+    assert.strictEqual(cycleCount, 3, 'Cycleloop should run 3 times');
+
 
     console.log('RevPiModIO tests passed.');
 }

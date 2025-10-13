@@ -1,3 +1,4 @@
+import fs from 'fs';
 import config from './config.js';
 import piControl from './piControl.js';
 import { Device, IO, IOList } from './devices.js';
@@ -17,6 +18,8 @@ class RevPiModIO {
         this.devices = [];
         this.io = new IOList();
         this.looping = false;
+        this.processImage = null;
+        this.length = 0;
 
         this._init();
     }
@@ -36,6 +39,7 @@ class RevPiModIO {
         piControl.open(this.options.simulator);
 
         this._createDevices();
+        this.processImage = Buffer.alloc(this.length);
         this._startAutorefresh();
     }
 
@@ -56,13 +60,17 @@ class RevPiModIO {
             );
             this.devices.push(device);
 
+            if (devConfig.offset + devConfig.length > this.length) {
+                this.length = devConfig.offset + devConfig.length;
+            }
+
             for (const input of device.inputs) {
-                const io = new IO(input.name, input.offset, input.length, input.bit, 'input');
+                const io = new IO(this, input.name, devConfig.offset + input.offset, input.length, input.bit, 'input');
                 this.io.add(io);
             }
 
             for (const output of device.outputs) {
-                const io = new IO(output.name, output.offset, output.length, output.bit, 'output');
+                const io = new IO(this, output.name, devConfig.offset + output.offset, output.length, output.bit, 'output');
                 this.io.add(io);
             }
         }
@@ -82,8 +90,7 @@ class RevPiModIO {
         if (this.options.simulator) {
             // In simulator mode, we don't need to do anything here as the values are in memory
         } else {
-            // This will be implemented with ioctl calls
-            console.log('Reading from process image...');
+            fs.readSync(piControl.fd, this.processImage, 0, this.length, 0);
         }
     }
 
@@ -91,8 +98,7 @@ class RevPiModIO {
         if (this.options.simulator) {
             // In simulator mode, we don't need to do anything here as the values are in memory
         } else {
-            // This will be implemented with ioctl calls
-            console.log('Writing to process image...');
+            fs.writeSync(piControl.fd, this.processImage, 0, this.length, 0);
         }
     }
 

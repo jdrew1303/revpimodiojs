@@ -9,8 +9,8 @@ const PI_CONTROL_IO_AIN_VALUE = 2;
 const PI_CONTROL_IO_AOUT_VALUE = 3;
 
 const PICONTROL_IOC_BIT_SET = 19216;
-const PICONTROL_IOC_BIT_RESET = 19217;
-const PICONTROL_IOC_BIT_READ = 19218;
+const PICONTROL_IOC_COUNTER_RESET = 19220;
+const PICONTROL_IOC_RELAY_GET_CYCLES = 19229;
 
 class PiControl {
     constructor(devicePath = '/dev/piControl0') {
@@ -40,30 +40,28 @@ class PiControl {
 
     call(command, buffer) {
         if (this.isSimulator) {
-            const offset = buffer.readUInt16LE(0);
-            const bit = buffer.readUInt8(2);
-
             switch (command) {
-                case 19216: // PICONTROL_IOC_BIT_SET
+                case PICONTROL_IOC_BIT_SET:
                     {
+                        const offset = buffer.readUInt16LE(0);
+                        const bit = buffer.readUInt8(2);
+                        const value = buffer.length > 3 ? buffer.readUInt8(3) : 1;
                         let byte = this.mockProcessImage.readUInt8(offset);
-                        byte |= (1 << bit);
+                        if (value) {
+                            byte |= (1 << bit);
+                        } else {
+                            byte &= ~(1 << bit);
+                        }
                         this.mockProcessImage.writeUInt8(byte, offset);
                     }
                     break;
-                case 19217: // PICONTROL_IOC_BIT_RESET
-                    {
-                        let byte = this.mockProcessImage.readUInt8(offset);
-                        byte &= ~(1 << bit);
-                        this.mockProcessImage.writeUInt8(byte, offset);
-                    }
+                case PICONTROL_IOC_COUNTER_RESET:
+                    // This is a simplified simulation
+                    console.log('Simulating counter reset');
                     break;
-                case 19218: // PICONTROL_IOC_BIT_READ
-                    {
-                        const byte = this.mockProcessImage.readUInt8(offset);
-                        const value = (byte & (1 << bit)) !== 0;
-                        buffer.writeUInt8(value ? 1 : 0, 3);
-                    }
+                case PICONTROL_IOC_RELAY_GET_CYCLES:
+                    // This is a simplified simulation
+                    console.log('Simulating get relay cycles');
                     break;
             }
             return 0;

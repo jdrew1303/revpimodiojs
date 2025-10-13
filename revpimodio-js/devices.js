@@ -2,27 +2,23 @@ import { EventEmitter } from 'events';
 import piControl from './piControl.js';
 
 class IO extends EventEmitter {
-    constructor(name, offset, length, bit, type) {
+    constructor(revpi, name, offset, length, bit, type) {
         super();
+        this.revpi = revpi;
         this.name = name;
         this.offset = offset;
         this.length = length;
         this.bit = bit;
         this.type = type; // 'input' or 'output'
-        this._value = null;
     }
 
     get value() {
         if (this.length === 1 && this.bit !== undefined) {
-            const buffer = Buffer.alloc(4);
-            buffer.writeUInt16LE(this.offset, 0);
-            buffer.writeUInt8(this.bit, 2);
-            piControl.call(19218 /* PICONTROL_IOC_BIT_READ */, buffer);
-            return buffer.readUInt8(3) !== 0;
+            const byte = this.revpi.processImage.readUInt8(this.offset);
+            return (byte & (1 << this.bit)) !== 0;
         } else {
-            // Simplified for now, will need to handle different data types
             const buffer = Buffer.alloc(this.length);
-            piControl.mockProcessImage.copy(buffer, 0, this.offset, this.offset + this.length);
+            this.revpi.processImage.copy(buffer, 0, this.offset, this.offset + this.length);
             return buffer;
         }
     }
@@ -30,15 +26,16 @@ class IO extends EventEmitter {
     set value(newValue) {
         const oldValue = this.value;
         if (this.length === 1 && this.bit !== undefined) {
-            const buffer = Buffer.alloc(4);
-            buffer.writeUInt16LE(this.offset, 0);
-            buffer.writeUInt8(this.bit, 2);
-            buffer.writeUInt8(newValue ? 1 : 0, 3);
-            piControl.call(newValue ? 19216 /* PICONTROL_IOC_BIT_SET */ : 19217 /* PICONTROL_IOC_BIT_RESET */, buffer);
+            let byte = this.revpi.processImage.readUInt8(this.offset);
+            if (newValue) {
+                byte |= (1 << this.bit);
+            } else {
+                byte &= ~(1 << this.bit);
+            }
+            this.revpi.processImage.writeUInt8(byte, this.offset);
         } else {
-            // Simplified for now, will need to handle different data types
             const buffer = Buffer.from(newValue);
-            buffer.copy(piControl.mockProcessImage, this.offset);
+            buffer.copy(this.revpi.processImage, this.offset);
         }
 
         if (oldValue !== newValue) {
