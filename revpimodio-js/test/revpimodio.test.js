@@ -1,8 +1,7 @@
 import assert from 'assert';
-import RevPiModIO from '../revpimodio.js';
 import config from '../config.js';
-
 import path from 'path';
+import { RevPiModIO, RevPiModIOSelected } from '../revpimodio.js';
 
 // Mock the config loader to use our test config
 config.findConfig = () => path.resolve(process.cwd(), 'revpimodio-js/test/mock-config.rsc');
@@ -15,12 +14,18 @@ async function testRevPiModIO() {
     assert.strictEqual(rpi.devices.length, 1, 'Should load one device');
     assert.ok(rpi.io.Input1, 'Input1 should exist');
     assert.ok(rpi.io.Output1, 'Output1 should exist');
+    assert.ok(rpi.io.InputCounter1, 'InputCounter1 should exist');
 
     rpi.io.Output1.value = true;
     assert.strictEqual(rpi.io.Output1.value, true, 'Output1 should be true');
 
     rpi.io.Output1.value = false;
     assert.strictEqual(rpi.io.Output1.value, false, 'Output1 should be false');
+
+    rpi.io.InputCounter1.value = 12345;
+    assert.strictEqual(rpi.io.InputCounter1.value, 12345, 'InputCounter1 should be 12345');
+    rpi.io.InputCounter1.reset();
+
 
     let eventFired = false;
     rpi.io.Output1.reg_event((name, value) => {
@@ -43,8 +48,30 @@ async function testRevPiModIO() {
     await cyclePromise;
     assert.strictEqual(cycleCount, 3, 'Cycleloop should run 3 times');
 
-
     console.log('RevPiModIO tests passed.');
 }
 
-testRevPiModIO();
+async function testRevPiModIOSelected() {
+    console.log('Running RevPiModIOSelected tests...');
+
+    const rpi = new RevPiModIOSelected('MyDevice', { simulator: true });
+
+    assert.strictEqual(rpi.devices.length, 1, 'Should load one device');
+    assert.ok(rpi.io.Input1, 'Input1 should exist');
+
+    const rpi2 = new RevPiModIOSelected(['MyDevice'], { simulator: true });
+    assert.strictEqual(rpi2.devices.length, 1, 'Should load one device');
+
+    const rpi3 = new RevPiModIOSelected('NonExistentDevice', { simulator: true });
+    assert.strictEqual(rpi3.devices.length, 0, 'Should load zero devices');
+
+
+    console.log('RevPiModIOSelected tests passed.');
+}
+
+async function runTests() {
+    await testRevPiModIO();
+    await testRevPiModIOSelected();
+}
+
+runTests();

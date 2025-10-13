@@ -1,7 +1,7 @@
 import fs from 'fs';
 import config from './config.js';
 import piControl from './piControl.js';
-import { Device, IO, IOList } from './devices.js';
+import { Device, IO, IntIO, IntIOCounter, RelaisOutput, IOList, ProductType } from './devices.js';
 
 class RevPiModIO {
     constructor(options = {}) {
@@ -21,6 +21,7 @@ class RevPiModIO {
         this.processImage = null;
         this.length = 0;
 
+        this.handlesignalend();
         this._init();
     }
 
@@ -43,12 +44,14 @@ class RevPiModIO {
         this._startAutorefresh();
     }
 
-    _createDevices() {
+    _createDevices(devices = null) {
         if (!this.config || !this.config.Devices) {
             return;
         }
 
-        for (const devConfig of this.config.Devices) {
+        const deviceList = devices || this.config.Devices;
+
+        for (const devConfig of deviceList) {
             // This is a simplified version of the device creation logic
             const device = new Device(
                 devConfig.name,
@@ -64,13 +67,31 @@ class RevPiModIO {
                 this.length = devConfig.offset + devConfig.length;
             }
 
+            const isDI = devConfig.productType === ProductType.DI || devConfig.productType === ProductType.DIO;
+            const isRO = devConfig.productType === ProductType.RO;
+
             for (const input of device.inputs) {
-                const io = new IO(this, input.name, devConfig.offset + input.offset, input.length, input.bit, 'input');
+                let io;
+                if (isDI && devConfig.inputs.find(i => i.name === input.name.replace('Counter', ''))) {
+                    const counterId = parseInt(input.name.replace(/[^0-9]/g, '')) - 1;
+                    io = new IntIOCounter(this, input.name, devConfig.offset + input.offset, input.length, input.bit, 'input', false, 'little', counterId, devConfig.position);
+                } else if (input.length > 1) {
+                    io = new IntIO(this, input.name, devConfig.offset + input.offset, input.length, input.bit, 'input');
+                } else {
+                    io = new IO(this, input.name, devConfig.offset + input.offset, input.length, input.bit, 'input');
+                }
                 this.io.add(io);
             }
 
             for (const output of device.outputs) {
-                const io = new IO(this, output.name, devConfig.offset + output.offset, output.length, output.bit, 'output');
+                let io;
+                if (isRO) {
+                    io = new RelaisOutput(this, output.name, devConfig.offset + output.offset, output.length, output.bit, 'output', devConfig.position);
+                } else if (output.length > 1) {
+                    io = new IntIO(this, output.name, devConfig.offset + output.offset, output.length, output.bit, 'output');
+                } else {
+                    io = new IO(this, output.name, devConfig.offset + output.offset, output.length, output.bit, 'output');
+                }
                 this.io.add(io);
             }
         }
@@ -111,6 +132,11 @@ class RevPiModIO {
         }
     }
 
+    handlesignalend() {
+        process.on('SIGINT', () => this.exit());
+        process.on('SIGTERM', () => this.exit());
+    }
+
     async cycleloop(func, cycletime = 50) {
         this.looping = true;
         while (this.looping) {
@@ -128,4 +154,40 @@ class RevPiModIO {
 
 }
 
-export default RevPiModIO;
+class RevPiModIOSelected extends RevPiModIO {
+    constructor(deviceselection, options = {}) {
+        super(options);
+        this.deviceselection = deviceselection;
+        this._init();
+    }
+
+    _init() {
+        try {
+            this.config = config.load();
+            if (this.options.debug) {
+                console.log('piCtory configuration loaded successfully.');
+            }
+        } catch (e) {
+            console.error(e.message);
+            // In a real scenario, we might want to handle this more gracefully
+            process.exit(1);
+        }
+
+        piControl.open(this.options.simulator);
+
+        const selectedDevices = this.config.Devices.filter(dev => {
+            if (Array.isArray(this.deviceselection)) {
+                return this.deviceselection.includes(dev.name) || this.deviceselection.includes(dev.position);
+            } else {
+                return this.deviceselection === dev.name || this.deviceselection === dev.position;
+            }
+        });
+
+        this._createDevices(selectedDevices);
+        this.processImage = Buffer.alloc(this.length);
+        this._startAutorefresh();
+    }
+}
+
+
+export { RevPiModIO, RevPiModIOSelected };

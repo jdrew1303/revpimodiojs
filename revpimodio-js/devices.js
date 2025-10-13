@@ -1,6 +1,15 @@
 import { EventEmitter } from 'events';
 import piControl from './piControl.js';
 
+const ProductType = {
+    DIO: 96,
+    DI: 97,
+    DO: 98,
+    AIO: 103,
+    MIO: 118,
+    RO: 137,
+};
+
 class IO extends EventEmitter {
     constructor(revpi, name, offset, length, bit, type) {
         super();
@@ -48,6 +57,78 @@ class IO extends EventEmitter {
     }
 }
 
+class IntIO extends IO {
+    constructor(revpi, name, offset, length, bit, type, signed = false, byteorder = 'little') {
+        super(revpi, name, offset, length, bit, type);
+        this.signed = signed;
+        this.byteorder = byteorder;
+    }
+
+    get value() {
+        const buffer = super.value;
+        if (this.byteorder === 'little') {
+            return this.signed ? buffer.readIntLE(0, this.length) : buffer.readUIntLE(0, this.length);
+        } else {
+            return this.signed ? buffer.readIntBE(0, this.length) : buffer.readUIntBE(0, this.length);
+        }
+    }
+
+    set value(newValue) {
+        const buffer = Buffer.alloc(this.length);
+        if (this.byteorder === 'little') {
+            this.signed ? buffer.writeIntLE(newValue, 0, this.length) : buffer.writeUIntLE(newValue, 0, this.length);
+        } else {
+            this.signed ? buffer.writeIntBE(newValue, 0, this.length) : buffer.writeUIntBE(newValue, 0, this.length);
+        }
+        super.value = buffer;
+    }
+}
+
+class IntIOCounter extends IntIO {
+    constructor(revpi, name, offset, length, bit, type, signed = false, byteorder = 'little', counterId, devicePosition) {
+        super(revpi, name, offset, length, bit, type, signed, byteorder);
+        this.counterId = counterId;
+        this.devicePosition = devicePosition;
+    }
+
+    reset() {
+        if (this.revpi.options.simulator) {
+            console.log(`Simulating counter reset for ${this.name}`);
+            return;
+        }
+        const buffer = Buffer.alloc(4);
+        buffer.writeUInt8(this.devicePosition, 0);
+        buffer.writeUInt16LE(1 << this.counterId, 2);
+        piControl.call(19220 /* PICONTROL_IOC_COUNTER_RESET */, buffer);
+    }
+}
+
+class RelaisOutput extends IO {
+    constructor(revpi, name, offset, length, bit, type, devicePosition) {
+        super(revpi, name, offset, length, bit, type);
+        this.devicePosition = devicePosition;
+    }
+
+    get_switching_cycles() {
+        if (this.revpi.options.simulator) {
+            console.log(`Simulating get_switching_cycles for ${this.name}`);
+            return 0;
+        }
+        const buffer = Buffer.alloc(17);
+        buffer.writeUInt8(this.devicePosition, 0);
+        piControl.call(19229 /* PICONTROL_IOC_RELAY_GET_CYCLES */, buffer);
+        if (this.bit !== undefined) {
+            return buffer.readUInt32LE(1 + this.bit * 4);
+        } else {
+            const cycles = [];
+            for (let i = 0; i < 4; i++) {
+                cycles.push(buffer.readUInt32LE(1 + i * 4));
+            }
+            return cycles;
+        }
+    }
+}
+
 class IOList {
     constructor() {}
 
@@ -70,4 +151,4 @@ class Device {
     }
 }
 
-export { Device, IO, IOList };
+export { Device, IO, IntIO, IntIOCounter, RelaisOutput, IOList, ProductType };
