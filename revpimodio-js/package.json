@@ -1,0 +1,23 @@
+{
+  "name": "revpimodio",
+  "version": "1.0.0",
+  "description": "A Node.js library for RevolutionPi, ported from the Python version.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "revolutionpi",
+    "kunbus",
+    "revpi",
+    "pictory"
+  ],
+  "author": "Jules",
+  "license": "LGPL-2.0-or-later",
+  "dependencies": {
+    "configparser": "^0.3.10",
+    "ioctl-napi": "^0.3.0",
+    "jspack": "^0.0.4"
+  }
+}
